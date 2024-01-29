@@ -1,0 +1,314 @@
+---
+title: "HockeyML"
+author: "Kevin Donohue"
+date: "2023-10-25"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+
+
+
+This chunk loads in all of my packages:
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+
+
+library(MASS)
+library(ggplot2)
+
+library(corrgram)
+library(tidyverse)
+
+library(class)
+library(caret)
+
+library(rpart)
+library(rpart.plot)
+```
+
+
+This chucnk loads in my team dataset
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+
+teamdata <- read.csv("C:/Users/kevin/OneDrive/Desktop/PDAT620G/HockeyML/teamdata.csv")
+View(teamdata)
+
+```
+
+
+This chunk removes the asterisk from team names 
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+teamdata$Tm <- gsub("\\*", "", teamdata$Tm)
+```
+
+
+
+This chunk creates a new Team Abbreviation variable based on the full team names
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+teamdata <- teamdata %>% 
+       mutate('Tm' = case_when(Tm == "Boston Bruins" ~ "BOS" ,
+  Tm == "Toronto Maple Leafs" ~ "TOR" ,
+  Tm == "Tampa Bay Lightning" ~ "TBL" ,
+  Tm == "Florida Panthers" ~ "FLA" ,
+  Tm == "Buffalo Sabres" ~ "BUF" ,
+  Tm == "Ottawa Senators" ~ "OTT" ,
+  Tm == "Detroit Red Wings" ~ "DET" ,
+  Tm == "Montreal Canadiens" ~ "MTL" ,
+  Tm == "Carolina Hurricanes" ~ "CAR" ,
+  Tm == "New Jersey Devils" ~ "NJD" ,
+  Tm == "New York Rangers" ~ "NYR" ,
+  Tm == "New York Islanders" ~ "NYI" ,
+  Tm == "Pittsburgh Penguins" ~ "PIT" ,
+  Tm == "Washington Capitals" ~ "WSH" ,
+  Tm == "Philadelphia Flyers" ~ "PHI" ,
+  Tm == "Columbus Blue Jackets" ~ "CBJ" ,
+  Tm == "Colorado Avalanche" ~ "COL" ,
+  Tm == "Dallas Stars" ~ "DAL" ,
+  Tm == "Minnesota Wild" ~ "MIN" ,
+  Tm == "Winnipeg Jets" ~ "WPG" ,
+  Tm == "Nashville Predators" ~ "NSH" ,
+  Tm == "St. Louis Blues" ~ "STL" ,
+  Tm == "Arizona Coyotes" ~ "ARI" ,
+  Tm == "Phoenix Coyotes" ~ "PHX" ,
+  Tm == "Chicago Blackhawks" ~ "CHI" ,
+  Tm == "Vegas Golden Knights" ~ "VEG" , 
+  Tm == "Edmonton Oilers" ~ "EDM" ,
+  Tm == "Los Angeles Kings" ~ "LAK" ,
+  Tm == "Seattle Kraken" ~ "SEA" ,
+  Tm == "Calgary Flames" ~ "CGY" ,
+  Tm == "Vancouver Canucks" ~ "VAN" ,
+  Tm == "San Jose Sharks" ~ "SJS" ,
+  Tm == "Anaheim Ducks" ~ "ANA" ,
+  Tm == "Atlanta Thrashers" ~ "ATL" ))
+
+#View(teamdata)
+```
+
+
+
+
+This chunk loads in my goalie data
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+goaliedata <- read.csv("C:/Users/kevin/OneDrive/Desktop/PDAT620G/HockeyML/goaliedata.csv")
+head(goaliedata)
+```
+
+
+
+This chunk filters out the value "TOT" from the team variable as these are duplicates
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+goaliedata <- goaliedata %>%
+  filter(!Tm %in% c( "TOT"))
+```
+
+
+This chunk groups the goalie data by team and year, and sums the numerical variables
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+consolidated_goalie <- goaliedata %>%
+  group_by(Tm, Yr) %>%
+  summarise(across(where(is.numeric), sum))
+
+
+#View(consolidated_goalie)
+```
+
+
+This chunk loads in my skater data
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep="none"}
+skaterdata <- read.csv("C:/Users/kevin/OneDrive/Desktop/PDAT620G/HockeyML/skaterdata.csv")
+head(skaterdata)
+```
+
+This chunk filters out unneccesary team values
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+skaterdata <- skaterdata %>%
+  filter(!Tm %in% c("F", "D", "TOT"))
+```
+
+This chunk groups the skater data by team and year, and sums the numerical variables
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+consolidated_skater <- skaterdata %>%
+  group_by(Tm, Yr) %>%
+  summarise(across(where(is.numeric), sum))
+
+
+View(consolidated_skater)
+```
+
+
+
+
+This chunk joins the three datasets into the full data set and renames select variables
+```{r, message=FALSE, warning=FALSE, results = 'hide',fig.keep="none"}
+almostfulldata <- full_join(consolidated_skater, consolidated_goalie, by = c("Tm", "Yr"))
+
+
+
+
+fulldata <- full_join(almostfulldata, teamdata, by = c("Tm", "Yr"))
+view(fulldata)
+
+
+fulldata <- select(fulldata, GF, GA.y, SOS, OL, W.y, SA, SV, X..., PIM.x, S, HIT, FOW, Playoffs) %>%
+  rename(
+  GA = GA.y, W = W.y, PM = X..., PIM = PIM.x)
+
+#View(fulldata)
+
+#write_csv(fulldata, "fulldata.csv")
+
+
+```
+
+POST DATA CLEANING:
+
+
+This chunk loads in the full dataset and creates a corr plot of the variables
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep="none"}
+fulldata <- read.csv("C:/Users/kevin/OneDrive/Desktop/PDAT620G/HockeyML/fulldata.csv")
+head(fulldata)
+corrgram(fulldata, lower.panel=panel.shade, upper.panel=panel.cor, main = "")
+```
+
+
+This dataset identifies which variables have NA values and how many
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+
+
+
+
+na_counts <- count_NA(fulldata)
+
+
+print(na_counts)
+
+```
+
+
+This chunk shows the imputation of the median for th HIT and FOW variables
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+
+
+fulldata$HIT[is.na(fulldata$HIT)] <- median(fulldata$HIT, na.rm = TRUE)
+fulldata$FOW[is.na(fulldata$FOW)] <- median(fulldata$FOW, na.rm = TRUE)
+
+
+```
+
+
+
+This chunk creates testing and training sets 
+
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+set.seed(123)
+splitIndex <- createDataPartition(fulldata$W, p = 0.8, list = FALSE)
+train_data <- fulldata[splitIndex, ]
+test_data <- fulldata[-splitIndex, ]
+```
+
+This chunk creates my model and checks for VIF values
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+model <- lm(W ~ GF  +  SV + PIM + S + HIT + FOW + OL, data = train_data[, sapply(train_data, is.numeric)])
+vif_values <- vif(model)
+
+
+print(vif_values)
+
+```
+
+
+ASSUMPTIONS:
+
+This chunk makes the Residuals vs. Fitted Values Plot (or Residuals vs. Predicted Values).
+its purpose is to check for LINEARITY and INDEPENDECE
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+plot(model, which = 1)
+```
+
+This chunk creates the Normal Q-Q Plot:
+its purpose is to check the NORMALITY of residuals.
+
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+qqnorm(residuals(model))
+qqline(residuals(model))
+```
+
+
+
+
+The chunk creates the Scale-Location (or Spread-Location) Plot:
+its purpose is to check for homoscedasticity (constant variance of residuals).
+
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+sqrt_abs_standardized_residuals <- sqrt(abs(rstandard(model)))
+plot(fitted(model), sqrt_abs_standardized_residuals, ylab = "sqrt(|Standardized Residuals|)", xlab = "Fitted Values", main = "Scale-Location Plot")
+abline(h = mean(sqrt_abs_standardized_residuals))
+```
+
+
+
+
+This chunk is for scaling/normalizing data:
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+train_data[, sapply(train_data, is.numeric)] <- scale(train_data[, sapply(train_data, is.numeric)])
+test_data[, sapply(test_data, is.numeric)] <- scale(test_data[, sapply(test_data, is.numeric)])
+  
+```
+
+
+
+This chunk evaluates the regression model by making predictions and calculating error and R-squared
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+
+
+model <- lm(W ~ GF  +  SV + PIM + S + HIT + FOW + OL, data = train_data)
+
+
+summary(model)
+
+
+predictions <- predict(model, newdata = test_data[, sapply(test_data, is.numeric)])
+
+
+mae <- mean(abs(predictions - test_data$W))
+mse <- mean((predictions - test_data$W)^2)
+rmse <- sqrt(mse)
+
+
+
+cat("Mean Absolute Error:", mae, "\n")
+cat("Mean Squared Error:", mse, "\n")
+cat("Root Mean Squared Error:", rmse, "\n")
+#cat("R-squared:", rsquared, "\n")
+summary(model)
+```
+
+
+
+his chunk evaluates the CART model by making predictions and calculating error and R-squared
+```{r, message=FALSE, warning=FALSE, results = 'hide', fig.keep = "none"}
+
+model2 <- rpart(W ~ GF  +  SV + PIM + S + HIT + FOW + OL, data = train_data)
+
+rpart.plot(model2)
+
+
+predictions2 <- predict(model2, newdata = test_data)
+
+
+mae2 <- mean(abs(predictions2 - test_data$W))
+mse2 <- mean((predictions2 - test_data$W)^2)
+rmse2 <- sqrt(mse2)
+rsquared2 <- cor(predictions2, test_data$W)^2  # R-squared for random forest
+
+cat("Mean Absolute Error:", mae2, "\n")
+cat("Mean Squared Error:", mse2, "\n")
+cat("Root Mean Squared Error:", rmse2, "\n")
+cat("R-squared:", rsquared2, "\n")
+
+
+```
+
+
